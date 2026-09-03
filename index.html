@@ -109,13 +109,13 @@
 </header>
 
 <div class="navbar">
-  <button id="navStudent" class="active">근무시간 입력 (학생용)</button>
-  <button id="navAdmin">전체 시간표 확인 (관리자용)</button>
-  <button id="navSettings">시정표·배정기준 설정 (관리자용)</button>
+  <button id="navAll" class="active">전체 배정 시간표</button>
+  <button id="navStudent">근무 시간 입력 (학생용)</button>
+  <button id="navSettings">관리자용 페이지 (설정)</button>
 </div>
 
 <!-- ================= 학생용 페이지 ================= -->
-<div class="wrap" id="studentPage">
+<div class="wrap" id="studentPage" style="display:none;">
   <div class="card">
     <h2>① 이번 달 근무 일정 입력</h2>
     <p class="sub">달을 선택하면 그 달의 주차가 자동으로 나뉩니다. 주마다 시간이 똑같다면 1주차만 입력한 뒤 "1주차 내용 복사"를 누르세요.</p>
@@ -141,7 +141,7 @@
       <span><i class="dot" style="background:var(--gray-bg)"></i>기존 배정 있음</span>
       <span class="student-color-legend"></span>
       <span>★ 표시 = 필수 배정 규칙 적용</span>
-      <span><i class="dot" style="background:var(--amber-bg)"></i>미배정(가능 학생 없음)</span>
+      <span>빈 칸 = 미배정</span>
       <span><i class="dot" style="background:#5B5647"></i>수업 없음 / 배정 제외 시간</span>
     </div>
     <div class="view-toggle">
@@ -153,15 +153,16 @@
   </div>
 </div>
 
-<!-- ================= 관리자: 전체 확인 페이지 ================= -->
-<div class="wrap" id="adminPage" style="display:none;">
+<!-- ================= 전체 배정 시간표 (누구나 확인 가능) ================= -->
+<div class="wrap" id="adminPage">
   <div class="card">
-    <h2>관리자 페이지 — 학반 시간표 · 학생 시간표 한 화면에서 확인</h2>
+    <h2>전체 배정 시간표 — 학반 시간표 · 학생 시간표 한 화면에서 확인</h2>
     <p class="sub">모든 학생의 저장된 근무 일정을 불러와, 선택한 주의 학반별·학생별 시간표를 함께 보여줍니다.</p>
     <div class="admin-controls">
       확인할 달: <input type="month" id="adminMonthInput">
       주차: <select id="adminWeekSelect"></select>
       <button class="primary-btn small" id="adminRefreshBtn">불러오기</button>
+      <button class="copy-btn" id="exportAllExcelBtn">엑셀로 다운로드</button>
       <span class="status-msg" id="adminStatus"></span>
     </div>
     <p class="sub" id="adminHoursSummary"></p>
@@ -169,7 +170,7 @@
       <span><i class="dot" style="background:var(--gray-bg)"></i>기존 배정 있음</span>
       <span class="student-color-legend"></span>
       <span>★ 표시 = 필수 배정 규칙 적용</span>
-      <span><i class="dot" style="background:var(--amber-bg)"></i>미배정(가능 학생 없음)</span>
+      <span>빈 칸 = 미배정</span>
       <span><i class="dot" style="background:#5B5647"></i>수업 없음 / 배정 제외 시간</span>
     </div>
     <div id="adminResultArea"></div>
@@ -241,6 +242,7 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const DAYS = ['월','화','수','목','금'];
 const PERIODS = ['아침','1','2','3','4','점심1-2','점심3-6','6'];
@@ -694,7 +696,7 @@ function cellInfo(cname, d, p, assign){
     const style = `background:${c.bg};color:${c.fg};font-weight:700;${isForced ? `box-shadow:inset 0 0 0 2px ${c.fg};` : ''}`;
     return {text: asg + (isForced ? ' ★' : ''), cls:'assigned-dyn', style};
   }
-  return {text:'미배정', cls:'gap'};
+  return {text:'', cls:''};
 }
 
 function renderClassTable(cname, assign){
@@ -799,15 +801,15 @@ document.getElementById('genBtn').addEventListener('click', async ()=>{
 
 document.getElementById('monthInput').addEventListener('change', onMonthChange);
 
-// ---------- 상단 탭 전환 (관리자 탭은 비밀번호로 보호) ----------
+// ---------- 상단 탭 전환 (설정 페이지만 비밀번호로 보호) ----------
 let ADMIN_INITIALIZED = false;
 let ADMIN_UNLOCKED = false;
 function showPage(which){
+  document.getElementById('navAll').classList.toggle('active', which==='all');
   document.getElementById('navStudent').classList.toggle('active', which==='student');
-  document.getElementById('navAdmin').classList.toggle('active', which==='admin');
   document.getElementById('navSettings').classList.toggle('active', which==='settings');
+  document.getElementById('adminPage').style.display = which==='all' ? '' : 'none';
   document.getElementById('studentPage').style.display = which==='student' ? '' : 'none';
-  document.getElementById('adminPage').style.display = which==='admin' ? '' : 'none';
   document.getElementById('settingsPage').style.display = which==='settings' ? '' : 'none';
 }
 async function checkAdminAccess(){
@@ -822,10 +824,9 @@ async function checkAdminAccess(){
   ADMIN_UNLOCKED = true;
   return true;
 }
-document.getElementById('navStudent').addEventListener('click', ()=> showPage('student'));
-document.getElementById('navAdmin').addEventListener('click', async ()=>{
-  if(!(await checkAdminAccess())) return;
-  showPage('admin');
+document.getElementById('navAll').addEventListener('click', async ()=>{
+  showPage('all');
+  await ensureSettingsLoaded();
   if(!ADMIN_INITIALIZED){
     ADMIN_INITIALIZED = true;
     document.getElementById('adminMonthInput').value = CURRENT_MONTH;
@@ -833,13 +834,14 @@ document.getElementById('navAdmin').addEventListener('click', async ()=>{
   }
   refreshAdmin();
 });
+document.getElementById('navStudent').addEventListener('click', ()=> showPage('student'));
 document.getElementById('navSettings').addEventListener('click', async ()=>{
   if(!(await checkAdminAccess())) return;
   showPage('settings');
   buildSettingsPage();
 });
 
-// ---------- 관리자: 전체 확인 페이지 ----------
+// ---------- 전체 배정 시간표 페이지 ----------
 let ADMIN_WEEKS = [];
 function populateAdminWeekSelect(yearMonth){
   ADMIN_WEEKS = getWeeksOfMonth(yearMonth);
@@ -855,6 +857,57 @@ document.getElementById('adminMonthInput').addEventListener('change', ()=>{
   populateAdminWeekSelect(document.getElementById('adminMonthInput').value);
 });
 document.getElementById('adminRefreshBtn').addEventListener('click', refreshAdmin);
+
+let ALL_LAST_RESULT = null;
+let ALL_LAST_LABEL = '';
+
+function buildClassAOA(assign){
+  const aoa = [];
+  SETTINGS.classOrder.forEach(c=>{
+    aoa.push([`[${c}반]`]);
+    aoa.push(['교시', ...DAYS]);
+    PERIODS.forEach(p=>{
+      const row = [PERIOD_LABEL[p]];
+      DAYS.forEach(d=>{
+        const info = cellInfo(c,d,p,assign);
+        row.push((info.text||'').replace(' ★',' (필수)'));
+      });
+      aoa.push(row);
+    });
+    aoa.push([]);
+  });
+  return aoa;
+}
+function buildStudentAOA(studentSchedule, workHours){
+  const aoa = [];
+  SETTINGS.students.forEach(s=>{
+    aoa.push([`[${s}] 근무 ${workHours[s]}교시`]);
+    aoa.push(['교시', ...DAYS]);
+    PERIODS.forEach(p=>{
+      const row = [PERIOD_LABEL[p]];
+      DAYS.forEach(d=>{
+        const val = studentSchedule[s][d][p];
+        row.push(val ? `${val}반` : '');
+      });
+      aoa.push(row);
+    });
+    aoa.push([]);
+  });
+  return aoa;
+}
+function exportAllToExcel(){
+  if(!ALL_LAST_RESULT){ window.alert('먼저 "불러오기"를 눌러 시간표를 생성해주세요.'); return; }
+  if(typeof XLSX === 'undefined'){ window.alert('엑셀 생성 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인해주세요.'); return; }
+  const wb = XLSX.utils.book_new();
+  const ws1 = XLSX.utils.aoa_to_sheet(buildClassAOA(ALL_LAST_RESULT.assign));
+  ws1['!cols'] = [{wch:20}, {wch:12}, {wch:12}, {wch:12}, {wch:12}, {wch:12}];
+  const ws2 = XLSX.utils.aoa_to_sheet(buildStudentAOA(ALL_LAST_RESULT.studentSchedule, ALL_LAST_RESULT.workHours));
+  ws2['!cols'] = [{wch:20}, {wch:12}, {wch:12}, {wch:12}, {wch:12}, {wch:12}];
+  XLSX.utils.book_append_sheet(wb, ws1, '학반별 시간표');
+  XLSX.utils.book_append_sheet(wb, ws2, '학생별 시간표');
+  XLSX.writeFile(wb, `근로장학생_시간표_${ALL_LAST_LABEL || 'export'}.xlsx`);
+}
+document.getElementById('exportAllExcelBtn').addEventListener('click', exportAllToExcel);
 
 async function refreshAdmin(){
   const statusEl = document.getElementById('adminStatus');
@@ -893,6 +946,8 @@ async function refreshAdmin(){
   });
 
   const result = runAssignment(availability);
+  ALL_LAST_RESULT = result;
+  ALL_LAST_LABEL = `${yearMonth} ${ADMIN_WEEKS[weekIdx] ? (weekIdx+1)+'주차_'+ADMIN_WEEKS[weekIdx].label.replace(/\//g,'-') : ''}`;
   refreshLegends();
   const summary = SETTINGS.students.map(s=>`${s} ${result.workHours[s]}교시`).join(' · ');
   const wkLabel = ADMIN_WEEKS[weekIdx] ? `${weekIdx+1}주차 (${ADMIN_WEEKS[weekIdx].label})` : '';
@@ -1129,6 +1184,12 @@ document.getElementById('importSettingsInput').addEventListener('change', (e)=>{
   updateCapNoteText();
   updateAllHourDisplays();
   await loadAllStudents();
+
+  // 기본 진입 탭: 전체 배정 시간표
+  ADMIN_INITIALIZED = true;
+  document.getElementById('adminMonthInput').value = CURRENT_MONTH;
+  populateAdminWeekSelect(CURRENT_MONTH);
+  await refreshAdmin();
 })();
 </script>
 </body>
