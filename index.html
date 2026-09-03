@@ -32,7 +32,7 @@
   .stu-status{font-size:11px;font-weight:600;color:var(--gray-ink);}
   .week-block{background:#FBFAF6;border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:10px;}
   .week-title{font-size:12.5px;font-weight:700;color:var(--ink);margin-bottom:8px;}
-  .day-row{display:grid;grid-template-columns:88px 78px 1fr 1fr;gap:10px;align-items:center;padding:4px 0;font-size:13px;}
+  .day-row{display:grid;grid-template-columns:88px 62px 1fr 1fr 84px;gap:8px;align-items:center;padding:4px 0;font-size:13px;}
   .day-row .dname{font-weight:600;color:var(--ink);}
   .day-row .dname .ddate{font-weight:400;color:var(--gray-ink);font-size:11px;display:block;}
   .day-row label.tog{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft);cursor:pointer;user-select:none;}
@@ -80,8 +80,9 @@
   td.forced{background:var(--rose-bg);font-weight:700;color:#7C2E3C;}
   td.existing{background:var(--gray-bg);color:#5C584C;}
   td.gap{background:var(--amber-bg);color:#8A4E15;font-weight:600;}
-  td.noclass{background:#5B5647;color:#EFEDE6;font-size:11px;}
+  td.noclass{background:#4A463C;}
   td.excluded{background:#fff;color:#C9C4B7;}
+  table.tt td.period-label .ptime{font-weight:400;font-size:10px;color:var(--ink-soft);display:block;margin-top:1px;}
   .navbar{display:flex;gap:8px;max-width:1180px;margin:0 auto;padding:0 24px;flex-wrap:wrap;}
   .navbar button{border:1px solid var(--line);background:#fff;color:var(--ink-soft);
     padding:10px 20px;font-size:13.5px;font-weight:700;cursor:pointer;
@@ -163,6 +164,9 @@
       주차: <select id="adminWeekSelect"></select>
       <button class="primary-btn small" id="adminRefreshBtn">불러오기</button>
       <button class="copy-btn" id="exportAllExcelBtn">엑셀로 다운로드</button>
+      <button class="copy-btn" id="exportAllPdfBtn">PDF로 다운로드</button>
+      <button class="copy-btn" id="exportLunchBtn">점심 식사 현황 다운로드</button>
+      <button class="copy-btn" id="exportIssuesBtn">오류 점검표 다운로드</button>
       <span class="status-msg" id="adminStatus"></span>
     </div>
     <p class="sub" id="adminHoursSummary"></p>
@@ -172,6 +176,11 @@
       <span>★ 표시 = 필수 배정 규칙 적용</span>
       <span>빈 칸 = 미배정</span>
       <span><i class="dot" style="background:#5B5647"></i>수업 없음 / 배정 제외 시간</span>
+    </div>
+    <div class="view-toggle">
+      <button id="tabAllClass">학반별 보기</button>
+      <button id="tabAllStudent">학생별 보기</button>
+      <button id="tabAllBoth" class="active">한 화면에 보기</button>
     </div>
     <div id="adminResultArea"></div>
   </div>
@@ -200,11 +209,12 @@
     <h3>③ 학반 우선순위 (같은 시간에 여러 학반이 비어있을 때 먼저 배정할 순서)</h3>
     <div id="priorityOrderList" style="max-width:360px;margin-bottom:22px;"></div>
 
-    <h3>④ 필수 배정 규칙 (특정 학반·교시에는 항상 1명 우선 배정)</h3>
+    <h3>④ 필수 배정 규칙 (특정 학반·교시에는 항상 1명 우선 배정 — 여러 개 추가 가능)</h3>
+    <div class="chip-row" id="forceRuleChips"></div>
     <div class="admin-controls" style="margin-bottom:22px;">
       학반: <select id="forceClassSelect"></select>
       교시: <select id="forcePeriodSelect"></select>
-      <span style="color:var(--gray-ink);">쓰지 않으려면 둘 다 "없음"으로 두세요.</span>
+      <button class="copy-btn" id="addForceRuleBtn">+ 규칙 추가</button>
     </div>
 
     <h3>⑤ 월 근무시간 상한</h3>
@@ -212,7 +222,11 @@
       <input type="number" id="capInput" min="1" style="width:80px;"> 시간
     </div>
 
-    <h3>⑤-1 관리자 비밀번호</h3>
+    <h3>⑥ 교시 시간 설정 (시정표 종 치는 시각이 바뀔 때 수정)</h3>
+    <p class="sub">여기서 바꾼 시간은 학생의 근무 가능 시간과 교시가 겹치는지 계산할 때, 그리고 시간표에 표시되는 교시 시각에 그대로 반영됩니다.</p>
+    <div id="periodTimeEditor" style="margin-bottom:22px;"></div>
+
+    <h3>⑥-1 관리자 비밀번호</h3>
     <p class="sub">관리자 페이지(전체 시간표 확인, 설정)에 들어올 때 필요한 비밀번호입니다. 비밀번호를 바꾸면 다음에 관리자 탭을 여는 사람부터 새 비밀번호로 확인합니다.</p>
     <div class="admin-controls" style="margin-bottom:22px;">
       새 비밀번호: <input type="text" id="newPasswordInput" placeholder="새 관리자 비밀번호" style="width:200px;">
@@ -220,7 +234,7 @@
       <span class="status-msg" id="passwordStatus"></span>
     </div>
 
-    <h3>⑥ 학반별 요일·교시 상태 (시정표 + 강사/튜터 등 기존 배정)</h3>
+    <h3>⑦ 학반별 요일·교시 상태 (시정표 + 강사/튜터 등 기존 배정)</h3>
     <p class="sub">배정가능 = 근로장학생 배정 후보 · 기존배정 = 이미 담당자가 있음(오른쪽 칸에 이름/과목 입력) · 수업없음 = 그 시간엔 수업 자체가 없음 · 배정제외 = 수업은 있지만 근로장학생은 넣지 않음</p>
     <div id="settingsGrid" class="grid-wrap"></div>
 
@@ -229,7 +243,7 @@
       <span class="status-msg" id="settingsStatus"></span>
     </div>
 
-    <h3 style="margin-top:32px;">⑦ 설정 파일 내보내기 / 업로드</h3>
+    <h3 style="margin-top:32px;">⑧ 설정 파일 내보내기 / 업로드</h3>
     <p class="sub">전체 설정(학생·학반·시정표·배정기준)을 파일로 저장하거나, 미리 준비한 설정 파일을 올려서 한 번에 반영할 수 있습니다.</p>
     <div class="admin-controls">
       <button class="copy-btn" id="exportSettingsBtn">설정 파일 내보내기(.json)</button>
@@ -243,17 +257,26 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 const DAYS = ['월','화','수','목','금'];
 const PERIODS = ['아침','1','2','3','4','점심1-2','점심3-6','6'];
-const PERIOD_LABEL = {
-  '아침':'아침(8:20~8:50)','1':'1(8:50~9:30)','2':'2(9:40~10:20)','3':'3(10:30~11:10)',
-  '4':'4(11:20~12:00)','점심1-2':'점심1-2(12:00~12:50)','점심3-6':'점심3-6(12:50~13:30)','6':'6(13:30~14:10)'
+const PERIOD_NAMES = {
+  '아침':'아침','1':'1교시','2':'2교시','3':'3교시','4':'4교시',
+  '점심1-2':'점심(1·2학년)','점심3-6':'점심(3~6학년)','6':'6교시'
 };
-const PERIOD_TIME = {
+const DEFAULT_PERIOD_TIME = {
   '아침':[500,530],'1':[530,570],'2':[580,620],'3':[630,670],'4':[680,720],
   '점심1-2':[720,770],'점심3-6':[770,810],'6':[810,850]
 };
+function minToTimeStr(min){ const h=Math.floor(min/60), m=min%60; return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`; }
+function periodTimeRange(p){
+  const t = (SETTINGS && SETTINGS.periodTimes && SETTINGS.periodTimes[p]) ? SETTINGS.periodTimes[p] : DEFAULT_PERIOD_TIME[p];
+  return `${minToTimeStr(t[0])}~${minToTimeStr(t[1])}`;
+}
+function periodLabelHtml(p){ return `${PERIOD_NAMES[p]}<span class="ptime">${periodTimeRange(p)}</span>`; }
+function periodLabelPlain(p){ return `${PERIOD_NAMES[p]} ${periodTimeRange(p)}`; }
 
 // ---- 최초 기본값(도입 당시 학교 시정표를 그대로 반영한 시작점, 이후엔 전부 ⑥번 화면에서 수정) ----
 const DEFAULT_CLASSES = ['1-1','1-2','2-2','3-2','3-3','4-2','4-4','5-2'];
@@ -338,7 +361,8 @@ function buildDefaultSettings(){
     classes: DEFAULT_CLASSES.slice(),
     classOrder: DEFAULT_CLASSES.slice(),
     cells,
-    forceClass:'5-2', forcePeriod:'아침',
+    forceRules: [{class:'5-2', period:'아침'}],
+    periodTimes: JSON.parse(JSON.stringify(DEFAULT_PERIOD_TIME)),
     monthlyCap:80,
     adminPassword:'admin1234'
   };
@@ -361,9 +385,19 @@ function normalizeSettings(loaded){
   });
   loaded.classOrder = Array.isArray(loaded.classOrder) ? loaded.classOrder.filter(c=>loaded.classes.includes(c)) : [];
   loaded.classes.forEach(c=>{ if(!loaded.classOrder.includes(c)) loaded.classOrder.push(c); });
-  if(loaded.forceClass===undefined) loaded.forceClass = def.forceClass;
-  if(loaded.forcePeriod===undefined) loaded.forcePeriod = def.forcePeriod;
-  if(loaded.forceClass && !loaded.classes.includes(loaded.forceClass)) loaded.forceClass = '';
+  if(!Array.isArray(loaded.forceRules)){
+    // 이전 버전(단일 규칙) 호환 처리
+    if(loaded.forceClass){ loaded.forceRules = [{class:loaded.forceClass, period:loaded.forcePeriod || '아침'}]; }
+    else { loaded.forceRules = def.forceRules; }
+  }
+  loaded.forceRules = loaded.forceRules.filter(r=>r && r.class && loaded.classes.includes(r.class) && PERIODS.includes(r.period));
+  delete loaded.forceClass; delete loaded.forcePeriod;
+  if(!loaded.periodTimes) loaded.periodTimes = {};
+  PERIODS.forEach(p=>{
+    if(!Array.isArray(loaded.periodTimes[p]) || loaded.periodTimes[p].length!==2){
+      loaded.periodTimes[p] = DEFAULT_PERIOD_TIME[p].slice();
+    }
+  });
   if(!loaded.monthlyCap || loaded.monthlyCap<=0) loaded.monthlyCap = def.monthlyCap;
   if(!loaded.adminPassword) loaded.adminPassword = def.adminPassword;
   return loaded;
@@ -456,12 +490,14 @@ function buildStudentForm(){
           <label class="tog"><input type="checkbox" id="chk-${name}-${wi}-${d}"> 근무</label>
           <input type="time" id="start-${name}-${wi}-${d}" value="08:30" disabled>
           <input type="time" id="end-${name}-${wi}-${d}" value="14:30" disabled>
+          <label class="tog"><input type="checkbox" id="lunch-${name}-${wi}-${d}" disabled> 점심 식사</label>
         `;
         wkDiv.appendChild(row);
         const chk = row.querySelector(`#chk-${name}-${wi}-${d}`);
         const st = row.querySelector(`#start-${name}-${wi}-${d}`);
         const en = row.querySelector(`#end-${name}-${wi}-${d}`);
-        chk.addEventListener('change', ()=>{ st.disabled=!chk.checked; en.disabled=!chk.checked; updateHourDisplay(name); });
+        const lu = row.querySelector(`#lunch-${name}-${wi}-${d}`);
+        chk.addEventListener('change', ()=>{ st.disabled=!chk.checked; en.disabled=!chk.checked; lu.disabled=!chk.checked; if(!chk.checked) lu.checked=false; updateHourDisplay(name); });
         st.addEventListener('change', ()=>updateHourDisplay(name));
         en.addEventListener('change', ()=>updateHourDisplay(name));
       });
@@ -478,11 +514,14 @@ function copyFirstWeekToAll(name){
     const chk0 = document.getElementById(`chk-${name}-0-${d}`).checked;
     const st0 = document.getElementById(`start-${name}-0-${d}`).value;
     const en0 = document.getElementById(`end-${name}-0-${d}`).value;
+    const lu0 = document.getElementById(`lunch-${name}-0-${d}`).checked;
     for(let wi=1; wi<CURRENT_WEEKS.length; wi++){
       const chk = document.getElementById(`chk-${name}-${wi}-${d}`);
       const st = document.getElementById(`start-${name}-${wi}-${d}`);
       const en = document.getElementById(`end-${name}-${wi}-${d}`);
-      chk.checked = chk0; st.disabled=!chk0; en.disabled=!chk0; st.value=st0; en.value=en0;
+      const lu = document.getElementById(`lunch-${name}-${wi}-${d}`);
+      chk.checked = chk0; st.disabled=!chk0; en.disabled=!chk0; lu.disabled=!chk0;
+      st.value=st0; en.value=en0; lu.checked=chk0 ? lu0 : false;
     }
   });
   updateHourDisplay(name);
@@ -494,9 +533,11 @@ function getStudentFormData(name){
     DAYS.forEach(d=>{
       const chkEl = document.getElementById(`chk-${name}-${wi}-${d}`);
       const chk = chkEl ? chkEl.checked : false;
+      const luEl = document.getElementById(`lunch-${name}-${wi}-${d}`);
       days[d] = chk ? {
         start: document.getElementById(`start-${name}-${wi}-${d}`).value || '08:30',
-        end: document.getElementById(`end-${name}-${wi}-${d}`).value || '14:30'
+        end: document.getElementById(`end-${name}-${wi}-${d}`).value || '14:30',
+        lunch: luEl ? luEl.checked : false
       } : null;
     });
     return { mondayISO: wk.mondayISO, days };
@@ -513,9 +554,10 @@ function setStudentFormData(name, data){
       if(!chk) return;
       const st = document.getElementById(`start-${name}-${wi}-${d}`);
       const en = document.getElementById(`end-${name}-${wi}-${d}`);
+      const lu = document.getElementById(`lunch-${name}-${wi}-${d}`);
       const val = wk.days ? wk.days[d] : null;
-      if(val){ chk.checked=true; st.disabled=false; en.disabled=false; st.value=val.start; en.value=val.end; }
-      else { chk.checked=false; st.disabled=true; en.disabled=true; }
+      if(val){ chk.checked=true; st.disabled=false; en.disabled=false; lu.disabled=false; st.value=val.start; en.value=val.end; lu.checked=!!val.lunch; }
+      else { chk.checked=false; st.disabled=true; en.disabled=true; lu.disabled=true; lu.checked=false; }
     });
   });
 }
@@ -618,7 +660,7 @@ function buildAvailabilityForWeek(allData, weekIdx){
       PERIODS.forEach(p=>{
         if(!w){ availability[name][d][p] = false; return; }
         const ws = timeToMin(w.start), we = timeToMin(w.end);
-        const [ps, pe] = PERIOD_TIME[p];
+        const [ps, pe] = SETTINGS.periodTimes[p];
         availability[name][d][p] = (ws < pe) && (we > ps);
       });
     });
@@ -639,10 +681,9 @@ function runAssignment(availability){
         if(cell.status === 'open') needing.push(c);
       });
       if(needing.length===0) return;
-      let ordered = needing.slice();
-      if(SETTINGS.forceClass && p===SETTINGS.forcePeriod && needing.includes(SETTINGS.forceClass)){
-        ordered = [SETTINGS.forceClass, ...needing.filter(c=>c!==SETTINGS.forceClass)];
-      }
+      const forcedHere = SETTINGS.forceRules.filter(r=>r.period===p && needing.includes(r.class)).map(r=>r.class);
+      const forcedUnique = [...new Set(forcedHere)];
+      let ordered = [...forcedUnique, ...needing.filter(c=>!forcedUnique.includes(c))];
       const used = new Set();
       ordered.forEach(c=>{
         let candidates = SETTINGS.students.filter(s=> availability[s][d][p] && !used.has(s));
@@ -686,12 +727,12 @@ function refreshLegends(){
 
 function cellInfo(cname, d, p, assign){
   const cell = SETTINGS.cells[cname][d][p];
-  if(cell.status==='noclass') return {text:'수업없음', cls:'noclass'};
+  if(cell.status==='noclass') return {text:'', cls:'noclass'};
   if(cell.status==='existing') return {text:cell.text||'', cls:'existing'};
   if(cell.status==='excluded') return {text:'－', cls:'excluded'};
   const asg = assign[cname][d][p];
   if(asg){
-    const isForced = (cname===SETTINGS.forceClass && p===SETTINGS.forcePeriod);
+    const isForced = SETTINGS.forceRules.some(r=>r.class===cname && r.period===p);
     const c = getStudentColor(asg);
     const style = `background:${c.bg};color:${c.fg};font-weight:700;${isForced ? `box-shadow:inset 0 0 0 2px ${c.fg};` : ''}`;
     return {text: asg + (isForced ? ' ★' : ''), cls:'assigned-dyn', style};
@@ -700,11 +741,11 @@ function cellInfo(cname, d, p, assign){
 }
 
 function renderClassTable(cname, assign){
-  let html = `<div><div class="tt-title">[${cname}반]</div><table class="tt"><thead><tr><th style="width:120px;">교시</th>`;
+  let html = `<div><div class="tt-title">[${cname}반]</div><table class="tt"><thead><tr><th style="width:128px;">교시</th>`;
   DAYS.forEach(d=> html += `<th>${d}</th>`);
   html += '</tr></thead><tbody>';
   PERIODS.forEach(p=>{
-    html += `<tr><td class="period-label">${PERIOD_LABEL[p]}</td>`;
+    html += `<tr><td class="period-label">${periodLabelHtml(p)}</td>`;
     DAYS.forEach(d=>{
       const info = cellInfo(cname,d,p,assign);
       html += `<td class="${info.cls}" style="${info.style||''}">${info.text}</td>`;
@@ -716,11 +757,11 @@ function renderClassTable(cname, assign){
 }
 function renderStudentTable(sname, studentSchedule, workHours){
   const c = getStudentColor(sname);
-  let html = `<div><div class="tt-title" style="background:${c.fg};">[${sname}] 이번 주 ${workHours[sname]}교시</div><table class="tt"><thead><tr><th style="width:120px;">교시</th>`;
+  let html = `<div><div class="tt-title" style="background:${c.fg};">[${sname}] 이번 주 ${workHours[sname]}교시</div><table class="tt"><thead><tr><th style="width:128px;">교시</th>`;
   DAYS.forEach(d=> html += `<th>${d}</th>`);
   html += '</tr></thead><tbody>';
   PERIODS.forEach(p=>{
-    html += `<tr><td class="period-label">${PERIOD_LABEL[p]}</td>`;
+    html += `<tr><td class="period-label">${periodLabelHtml(p)}</td>`;
     DAYS.forEach(d=>{
       const val = studentSchedule[sname][d][p];
       html += val ? `<td style="background:${c.bg};color:${c.fg};font-weight:700;">${val}반</td>` : `<td></td>`;
@@ -867,7 +908,7 @@ function buildClassAOA(assign){
     aoa.push([`[${c}반]`]);
     aoa.push(['교시', ...DAYS]);
     PERIODS.forEach(p=>{
-      const row = [PERIOD_LABEL[p]];
+      const row = [periodLabelPlain(p)];
       DAYS.forEach(d=>{
         const info = cellInfo(c,d,p,assign);
         row.push((info.text||'').replace(' ★',' (필수)'));
@@ -884,7 +925,7 @@ function buildStudentAOA(studentSchedule, workHours){
     aoa.push([`[${s}] 근무 ${workHours[s]}교시`]);
     aoa.push(['교시', ...DAYS]);
     PERIODS.forEach(p=>{
-      const row = [PERIOD_LABEL[p]];
+      const row = [periodLabelPlain(p)];
       DAYS.forEach(d=>{
         const val = studentSchedule[s][d][p];
         row.push(val ? `${val}반` : '');
@@ -908,6 +949,119 @@ function exportAllToExcel(){
   XLSX.writeFile(wb, `근로장학생_시간표_${ALL_LAST_LABEL || 'export'}.xlsx`);
 }
 document.getElementById('exportAllExcelBtn').addEventListener('click', exportAllToExcel);
+
+// ---------- PDF 다운로드 (화면에 보이는 색상 그대로) ----------
+async function canvasToPdfAndSave(canvas, filename){
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({orientation:'landscape', unit:'pt', format:'a4'});
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const imgWidth = pageWidth;
+  const imgHeight = canvas.height * imgWidth / canvas.width;
+  const imgData = canvas.toDataURL('image/png');
+  let heightLeft = imgHeight;
+  let position = 0;
+  pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+  heightLeft -= pageHeight;
+  while(heightLeft > 0){
+    position = heightLeft - imgHeight;
+    pdf.addPage();
+    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+  }
+  pdf.save(filename);
+}
+function pdfLibsReady(){
+  if(typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined'){
+    window.alert('PDF 생성 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인한 뒤 새로고침해 주세요.');
+    return false;
+  }
+  return true;
+}
+
+// "PDF로 다운로드": 지금 화면에 보이는 보기(학반별/학생별/한 화면) 그대로 PDF로 저장
+document.getElementById('exportAllPdfBtn').addEventListener('click', async ()=>{
+  if(!ALL_LAST_RESULT){ window.alert('먼저 "불러오기"를 눌러 시간표를 생성해주세요.'); return; }
+  if(!pdfLibsReady()) return;
+  const statusEl = document.getElementById('adminStatus');
+  statusEl.textContent = 'PDF 생성 중...';
+  const el = document.getElementById('adminResultArea');
+  const canvas = await html2canvas(el, {scale:2, backgroundColor:'#ffffff'});
+  await canvasToPdfAndSave(canvas, `근로장학생_시간표_${ALL_LAST_LABEL || 'export'}.pdf`);
+  statusEl.textContent = 'PDF 다운로드 완료';
+  setTimeout(()=>statusEl.textContent='', 2000);
+});
+
+// "오류 점검표 다운로드": 학반별·학생별을 항상 한 화면(양쪽 다)으로 강제 전환해 PDF로 저장 — 서로 대조하며 오류를 점검하기 위함
+document.getElementById('exportIssuesBtn').addEventListener('click', async ()=>{
+  if(!ALL_LAST_RESULT){ window.alert('먼저 "불러오기"를 눌러 시간표를 생성해주세요.'); return; }
+  if(!pdfLibsReady()) return;
+  const statusEl = document.getElementById('adminStatus');
+  statusEl.textContent = 'PDF 생성 중...';
+  const prevView = ALL_VIEW;
+  const prevBtnId = {class:'tabAllClass', student:'tabAllStudent', both:'tabAllBoth'}[prevView];
+  ALL_VIEW = 'both';
+  renderAllResult();
+  await new Promise(r=>setTimeout(r, 60));
+  const el = document.getElementById('adminResultArea');
+  const canvas = await html2canvas(el, {scale:2, backgroundColor:'#ffffff'});
+  await canvasToPdfAndSave(canvas, `학반학생_통합점검_${ALL_LAST_LABEL || 'export'}.pdf`);
+  ALL_VIEW = prevView;
+  renderAllResult();
+  setAllActiveTab(document.getElementById(prevBtnId));
+  statusEl.textContent = 'PDF 다운로드 완료';
+  setTimeout(()=>statusEl.textContent='', 2000);
+});
+
+// ---------- 점심 식사 현황 다운로드 (선택한 달 전체, 엑셀) ----------
+document.getElementById('exportLunchBtn').addEventListener('click', async ()=>{
+  await ensureSettingsLoaded();
+  if(typeof XLSX === 'undefined'){ window.alert('엑셀 생성 라이브러리를 불러오지 못했습니다.'); return; }
+  const statusEl = document.getElementById('adminStatus');
+  statusEl.textContent = '점심 식사 현황 불러오는 중...';
+  const yearMonth = document.getElementById('adminMonthInput').value || CURRENT_MONTH;
+  const weeks = getWeeksOfMonth(yearMonth);
+  const [ty, tm] = yearMonth.split('-').map(Number);
+
+  const allData = {};
+  for(const name of SETTINGS.students){
+    try{
+      const res = await STORAGE.get(`avail:${name}:${yearMonth}`, true);
+      allData[name] = res && res.value ? JSON.parse(res.value) : {weeks:[]};
+    }catch(e){ allData[name] = {weeks:[]}; }
+  }
+
+  const dateCols = [];
+  weeks.forEach((wk, wi)=>{
+    DAYS.forEach(d=>{
+      const dt = wk.dates[d];
+      if(dt.getFullYear()===ty && (dt.getMonth()+1)===tm){
+        dateCols.push({wi, d, label: `${fmtMD(dt)}(${d})`});
+      }
+    });
+  });
+
+  const rows = [['이름', ...dateCols.map(c=>c.label)]];
+  SETTINGS.students.forEach(name=>{
+    const row = [name];
+    dateCols.forEach(c=>{
+      const wk = allData[name].weeks ? allData[name].weeks[c.wi] : null;
+      const dayData = wk && wk.days ? wk.days[c.d] : null;
+      row.push(dayData ? (dayData.lunch ? 'O' : 'X') : '');
+    });
+    rows.push(row);
+  });
+  rows.push([]);
+  rows.push(['O = 근무하며 점심 식사함 · X = 근무하지만 점심 식사 안 함 · 빈 칸 = 그 날 근무 없음']);
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:14}, ...dateCols.map(()=>({wch:9}))];
+  XLSX.utils.book_append_sheet(wb, ws, '점심식사현황');
+  XLSX.writeFile(wb, `점심식사현황_${yearMonth}.xlsx`);
+  statusEl.textContent = '다운로드 완료';
+  setTimeout(()=>statusEl.textContent='', 2000);
+});
 
 async function refreshAdmin(){
   const statusEl = document.getElementById('adminStatus');
@@ -939,7 +1093,7 @@ async function refreshAdmin(){
       PERIODS.forEach(p=>{
         if(!w){ availability[name][d][p] = false; return; }
         const ws = timeToMin(w.start), we = timeToMin(w.end);
-        const [ps, pe] = PERIOD_TIME[p];
+        const [ps, pe] = SETTINGS.periodTimes[p];
         availability[name][d][p] = (ws < pe) && (we > ps);
       });
     });
@@ -953,14 +1107,35 @@ async function refreshAdmin(){
   const wkLabel = ADMIN_WEEKS[weekIdx] ? `${weekIdx+1}주차 (${ADMIN_WEEKS[weekIdx].label})` : '';
   document.getElementById('adminHoursSummary').textContent = `${wkLabel} 학생별 근무시간: ${summary}`;
 
-  const area = document.getElementById('adminResultArea');
-  area.innerHTML = `
-    <div class="grid-wrap two-col">
-      <div><h3 style="font-size:14px;margin:0 0 10px;">학반별 시간표</h3><div class="grid-wrap">${SETTINGS.classOrder.map(c=>renderClassTable(c,result.assign)).join('')}</div></div>
-      <div><h3 style="font-size:14px;margin:0 0 10px;">학생별 시간표</h3><div class="grid-wrap">${SETTINGS.students.map(s=>renderStudentTable(s,result.studentSchedule,result.workHours)).join('')}</div></div>
-    </div>`;
+  renderAllResult();
   statusEl.textContent = '불러오기 완료';
   setTimeout(()=>statusEl.textContent='', 2000);
+}
+
+let ALL_VIEW = 'both';
+function renderAllResult(){
+  if(!ALL_LAST_RESULT) return;
+  const {assign, studentSchedule, workHours} = ALL_LAST_RESULT;
+  const area = document.getElementById('adminResultArea');
+  let html = '';
+  if(ALL_VIEW==='class'){
+    html = `<div class="grid-wrap two-col">${SETTINGS.classOrder.map(c=>renderClassTable(c,assign)).join('')}</div>`;
+  } else if(ALL_VIEW==='student'){
+    html = `<div class="grid-wrap two-col">${SETTINGS.students.map(s=>renderStudentTable(s,studentSchedule,workHours)).join('')}</div>`;
+  } else {
+    html = `<div class="grid-wrap two-col">
+      <div><h3 style="font-size:14px;margin:0 0 10px;">학반별 시간표</h3><div class="grid-wrap">${SETTINGS.classOrder.map(c=>renderClassTable(c,assign)).join('')}</div></div>
+      <div><h3 style="font-size:14px;margin:0 0 10px;">학생별 시간표</h3><div class="grid-wrap">${SETTINGS.students.map(s=>renderStudentTable(s,studentSchedule,workHours)).join('')}</div></div>
+    </div>`;
+  }
+  area.innerHTML = html;
+}
+document.getElementById('tabAllClass').addEventListener('click', (e)=>{ ALL_VIEW='class'; setAllActiveTab(e.target); renderAllResult(); });
+document.getElementById('tabAllStudent').addEventListener('click', (e)=>{ ALL_VIEW='student'; setAllActiveTab(e.target); renderAllResult(); });
+document.getElementById('tabAllBoth').addEventListener('click', (e)=>{ ALL_VIEW='both'; setAllActiveTab(e.target); renderAllResult(); });
+function setAllActiveTab(btn){
+  btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
 }
 
 // ---------- 설정 페이지 ----------
@@ -1010,7 +1185,7 @@ function buildClassChips(){
       SETTINGS.classes = SETTINGS.classes.filter(c=>c!==name);
       SETTINGS.classOrder = SETTINGS.classOrder.filter(c=>c!==name);
       delete SETTINGS.cells[name];
-      if(SETTINGS.forceClass===name) SETTINGS.forceClass = '';
+      SETTINGS.forceRules = SETTINGS.forceRules.filter(r=>r.class!==name);
       buildSettingsPage();
     });
   });
@@ -1027,12 +1202,76 @@ document.getElementById('addClassBtn').addEventListener('click', ()=>{
   buildSettingsPage();
 });
 
+function buildForceRuleChips(){
+  const wrap = document.getElementById('forceRuleChips');
+  wrap.innerHTML = '';
+  if(SETTINGS.forceRules.length===0){
+    wrap.innerHTML = '<span style="font-size:12.5px;color:var(--gray-ink);">등록된 필수 배정 규칙이 없습니다.</span>';
+  }
+  SETTINGS.forceRules.forEach((r, idx)=>{
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.innerHTML = `${r.class}반 · ${periodLabelPlain(r.period)} <button data-remove-rule="${idx}" title="삭제">×</button>`;
+    wrap.appendChild(chip);
+  });
+  wrap.querySelectorAll('[data-remove-rule]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const idx = parseInt(b.dataset.removeRule,10);
+      SETTINGS.forceRules.splice(idx,1);
+      buildForceRuleChips();
+    });
+  });
+}
+document.getElementById('addForceRuleBtn').addEventListener('click', ()=>{
+  const cls = document.getElementById('forceClassSelect').value;
+  const per = document.getElementById('forcePeriodSelect').value;
+  if(!cls || !per) return;
+  if(SETTINGS.forceRules.some(r=>r.class===cls && r.period===per)){
+    window.alert('이미 등록된 규칙입니다.');
+    return;
+  }
+  SETTINGS.forceRules.push({class:cls, period:per});
+  buildForceRuleChips();
+});
+
+function buildPeriodTimeEditor(){
+  const wrap = document.getElementById('periodTimeEditor');
+  wrap.innerHTML = '';
+  const table = document.createElement('table');
+  table.className = 'tt';
+  table.style.maxWidth = '480px';
+  let rows = '<thead><tr><th>교시</th><th>시작</th><th>종료</th></tr></thead><tbody>';
+  PERIODS.forEach(p=>{
+    const t = SETTINGS.periodTimes[p];
+    rows += `<tr>
+      <td class="period-label">${PERIOD_NAMES[p]}</td>
+      <td><input type="time" data-pt-start="${p}" value="${minToTimeStr(t[0])}" style="width:100%;"></td>
+      <td><input type="time" data-pt-end="${p}" value="${minToTimeStr(t[1])}" style="width:100%;"></td>
+    </tr>`;
+  });
+  rows += '</tbody>';
+  table.innerHTML = rows;
+  wrap.appendChild(table);
+  wrap.querySelectorAll('[data-pt-start]').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const p = inp.dataset.ptStart;
+      SETTINGS.periodTimes[p][0] = timeToMin(inp.value);
+    });
+  });
+  wrap.querySelectorAll('[data-pt-end]').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const p = inp.dataset.ptEnd;
+      SETTINGS.periodTimes[p][1] = timeToMin(inp.value);
+    });
+  });
+}
+
 function buildCellEditorTable(cname){
   let html = `<div style="margin-bottom:26px;"><div class="tt-title">[${cname}반]</div><table class="tt"><thead><tr><th style="width:110px;">교시</th>`;
   DAYS.forEach(d=> html += `<th>${d}</th>`);
   html += '</tr></thead><tbody>';
   PERIODS.forEach(p=>{
-    html += `<tr><td class="period-label">${PERIOD_LABEL[p]}</td>`;
+    html += `<tr><td class="period-label">${periodLabelHtml(p)}</td>`;
     DAYS.forEach(d=>{
       const cell = SETTINGS.cells[cname][d][p];
       const safeText = (cell.text||'').replace(/"/g,'&quot;');
@@ -1075,11 +1314,13 @@ function buildSettingsPage(){
   }));
 
   const fcSel = document.getElementById('forceClassSelect');
-  fcSel.innerHTML = '<option value="">없음</option>' + SETTINGS.classes.map(c=>`<option value="${c}" ${SETTINGS.forceClass===c?'selected':''}>${c}반</option>`).join('');
+  fcSel.innerHTML = SETTINGS.classes.map(c=>`<option value="${c}">${c}반</option>`).join('');
   const fpSel = document.getElementById('forcePeriodSelect');
-  fpSel.innerHTML = '<option value="">없음</option>' + PERIODS.map(p=>`<option value="${p}" ${SETTINGS.forcePeriod===p?'selected':''}>${PERIOD_LABEL[p]}</option>`).join('');
+  fpSel.innerHTML = PERIODS.map(p=>`<option value="${p}">${periodLabelPlain(p)}</option>`).join('');
+  buildForceRuleChips();
 
   document.getElementById('capInput').value = SETTINGS.monthlyCap;
+  buildPeriodTimeEditor();
 
   const gridEl = document.getElementById('settingsGrid');
   gridEl.innerHTML = SETTINGS.classes.map(c=>buildCellEditorTable(c)).join('');
@@ -1116,8 +1357,6 @@ document.getElementById('changePasswordBtn').addEventListener('click', async ()=
 });
 
 document.getElementById('saveSettingsBtn').addEventListener('click', async ()=>{
-  SETTINGS.forceClass = document.getElementById('forceClassSelect').value || '';
-  SETTINGS.forcePeriod = document.getElementById('forcePeriodSelect').value || '';
   const capVal = parseFloat(document.getElementById('capInput').value);
   SETTINGS.monthlyCap = (isNaN(capVal) || capVal<=0) ? 80 : capVal;
   const statusEl = document.getElementById('settingsStatus');
